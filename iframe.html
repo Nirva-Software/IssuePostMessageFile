@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>iFrame receiving the file from parent</title>
+  </head>
+  <body>
+    <div>
+      <label>Read file first</label>
+      <input type="checkbox" id="readFile" />
+    </div>
+    <div>
+      <label>Send mode</label>
+      <select id="sendMode">
+        <option value="XMLHttpRequest" selected>Ran XMLHttpRequest</option>
+        <option value="fetch">fetch</option>
+      </select>
+    </div>
+    <div>
+      <label>Name of the file</label>
+      <span id="fileName"></span>
+    </div>
+    <div>
+      <label>Content of the file (dataURI)</label>
+      <span id="fileContent"></span>
+    </div>
+    
+    <script>
+      function readFile(file, doRead) {
+        return new Promise(function (resolve, reject) {
+          if (doRead) {
+            try {
+              var reader = new FileReader();
+              reader.onload = function() {
+                resolve(new File([new Uint8Array(reader.result)], file.name, { type: file.type }));
+              };
+              reader.onerror = function(event) {
+                reject(reader.error);
+              };
+              reader.readAsArrayBuffer(file);
+            } catch (error) {
+              console.error("Error reading file", error);
+              reject(error);
+            }
+          } else {
+            resolve(file);
+          }
+        });
+      }
+      function messageListener(event) {
+        var action = event.data.action;
+        document.getElementById("fileName").innerHTML = "";
+        document.getElementById("fileContent").innerHTML = "";
+        var doRead = document.getElementById("readFile").checked;
+        if ("sendFile" === action) {
+          var file = event.data.file;
+          readFile(file, doRead).then(function (file) {
+
+          var data = new FormData();
+          data.append(`file__0`, file, file.newName);
+
+          var sendMode = document.getElementById("sendMode").value;
+          console.log("Using send mode", sendMode);
+          let reqPromise;
+          switch(sendMode) {
+            case "fetch": {
+              reqPromise = fetch("/echo/body", {
+                method: "POST", 
+                mode: "no-cors", 
+                cache: "no-cache", 
+                credentials: "same-origin", 
+                redirect: "follow", 
+                referrerPolicy: "no-referrer", 
+                body: data
+              }).then(function (response) {
+                return response.text();
+              });
+            }
+            case "XMLHttpRequest": 
+            default: {
+              reqPromise = new Promise(function (resolve, reject) {
+                var request = new XMLHttpRequest();
+                request.open("POST", "/echo/body", true);
+                request.timeout = 600000;
+
+                request.onloadend = function onloadend() {
+                  if (!request) {
+                    return;
+                  }
+
+                  console.log("response", request.responseText, request.response);
+
+                  resolve(request.responseText);
+
+                  request = null;
+                };
+
+                request.onerror = function handleError(args) {
+                  reject(args);
+                };
+
+                request.send(data);
+              });
+              break;
+            }
+          }
+          
+          reqPromise.then(function(response) {
+            console.log("Pushed file", file, response);
+            document.getElementById("fileName").innerHTML = file.name;
+            document.getElementById("fileContent").innerHTML = typeof response === "undefined" ? "undefined" : response;
+          }).catch(function(error) {
+            console.error("File uploaded error", file, error);
+          });
+
+          }); // End of file reading promise
+        }
+        console.log("Message processed", "sendFile" === action, "file read ?", doRead);
+      };
+      window.addEventListener("message", messageListener, false);
+    </script>
+  </body>
+</html>
