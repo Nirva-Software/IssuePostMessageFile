@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Parent sending file to child</title>
+  </head>
+  <body>
+    <div>
+      <input type="file" id="fileSelector" />
+    </div>
+    <div>
+      <button id="sendFile">Send a Test file</button>
+    </div>
+    <iframe id="child" width="600" height="300" src="https://echobody.nirva-software.com/child.html"></iframe>
+    <script>
+      let globalFile = undefined;
+      document.getElementById("fileSelector").addEventListener("change", function (event) {
+        globalFile = this.files[0];
+      });
+      document.getElementById("sendFile").addEventListener("click", function (event) {
+        var file = globalFile || new File(["Test"], "test-file.txt", { type: "text/maybe" });
+        document.getElementById("child").contentWindow.postMessage({ action: "sendFile", file }, "*" );
+        console.log("send file to child", file);
+      });
+    </script>
+  </body>
+</html>
